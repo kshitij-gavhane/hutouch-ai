@@ -11,7 +11,11 @@
   ],
   "activationEvents": ["onCommand:hutouch.activate"],
   "main": "./extension.js",
-   "icon": "images/icon.png",
+  "repository": {
+        "type": "git",
+        "url": "https://github.com/kshitij-gavhane/hutouch-ai"
+    },
+  "icon": "images/icon.png",
     "contributes": {
     "commands": [
         {
