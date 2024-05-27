@@ -9,6 +9,7 @@
   "categories": [
     "Other"
   ],
+  "publisher": "Kshitij Gavhane",
   "activationEvents": ["onCommand:hutouch.activate"],
   "main": "./extension.js",
   "repository": {
