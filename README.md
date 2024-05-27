@@ -1,7 +1,6 @@
 # Hutouch File Finder Extension
 
 Hutouch File Finder is a Visual Studio Code extension that allows you to quickly search and open files by their name within your workspace. It skips common framework and dependency directories to focus on user-managed files.
-<!-- ![Image Description](images\icon.png)
 ## Features -->
 
 - Search for files by name (with or without extension) within the workspace.
