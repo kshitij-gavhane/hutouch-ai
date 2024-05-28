@@ -1,71 +1,27 @@
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
+const express = require('express');
+
+const PORT = 45678; // Using an uncommon port
 
 function activate(context) {
-    // Register the command with the updated command name from `package.json`
-    let disposable = vscode.commands.registerCommand('hutouch.activate', async () => {
-        const input = await vscode.window.showInputBox({ placeHolder: 'Enter the filename (with or without extension)' });
-        if (input) {
-            const rootPath = vscode.workspace.workspaceFolders
-                ? vscode.workspace.workspaceFolders[0].uri.fsPath
-                : ""; // Get the path of the first workspace folder
-            displayFileContent(input.toLowerCase(), rootPath);  // Convert input to lower case
-			console.log('rootPath: ', rootPath);
-        }
-    });
-
-    context.subscriptions.push(disposable);
+    startServer();
+    vscode.window.showInformationMessage(`Hutouch File Finder server started on port ${PORT}`);
 }
 
-function deactivate() {}
+function deactivate() {
+    if (server) {
+        server.close();
+    }
+}
 
 const EXCLUDED_DIRS = [
-    'node_modules',    // JavaScript/Node.js
-    '.vscode',         // Visual Studio Code settings
-    'dist',            // Distribution folders
-    'build',           // Build output folders
-    '.git',            // Git repository
-    'coverage',        // Code coverage reports
-    'out',             // Output directories
-    'bin',             // Binary files (Java, .NET)
-    'obj',             // Object files (C#, .NET)
-    'target',          // Maven/Gradle target directory (Java)
-    '__pycache__',     // Python bytecode cache
-    '.idea',           // IntelliJ IDEA settings
-    '.gradle',         // Gradle settings (Java)
-    '.mvn',            // Maven settings (Java)
-    '.settings',       // Eclipse settings (Java)
-    '.classpath',      // Eclipse classpath file (Java)
-    '.project',        // Eclipse project file (Java)
-    'CMakeFiles',      // CMake build system files
-    'CMakeCache.txt',  // CMake cache file
-    '.vs',             // Visual Studio settings
-    'packages',        // Various package managers (e.g., NuGet)
-    '.history',        // Local history (VSCode extensions)
-    '.terraform',      // Terraform state files
-    '.serverless',     // Serverless framework
-    '.pytest_cache',   // Pytest cache
-    '.venv',           // Python virtual environment
-    'Pods',            // CocoaPods (iOS)
-    'DerivedData',     // Xcode derived data (iOS)
-    'node_modules',    // npm/yarn (Node.js)
-    '.next',           // Next.js (React)
-    '.nuxt',           // Nuxt.js (Vue.js)
-    'vendor',          // Composer (PHP), Bundler (Ruby)
-    '.sass-cache',     // Sass cache
-    '.cache',          // Various cache directories
-    '.parcel-cache',   // Parcel bundler (JavaScript)
-    'elm-stuff',       // Elm language
-    '_site',           // Jekyll static site generator
-    'public',          // Public build output (various)
-    '.docusaurus',     // Docusaurus documentation
-    'static',          // Static files (various)
-    '.expo',           // Expo (React Native)
-    '.cache-loader',   // Webpack cache
-    'yarn.lock',       // Yarn lockfile
-    'package-lock.json'// npm lockfile
+    'node_modules', '.vscode', 'dist', 'build', '.git', 'coverage', 'out', 'bin', 'obj', 'target', '__pycache__',
+    '.idea', '.gradle', '.mvn', '.settings', '.classpath', '.project', 'CMakeFiles', 'CMakeCache.txt', '.vs',
+    'packages', '.history', '.terraform', '.serverless', '.pytest_cache', '.venv', 'Pods', 'DerivedData', '.next',
+    '.nuxt', 'vendor', '.sass-cache', '.cache', '.parcel-cache', 'elm-stuff', '_site', 'public', '.docusaurus',
+    'static', '.expo', '.cache-loader', 'yarn.lock', 'package-lock.json'
 ];
 
 // Function to check if a directory should be excluded
@@ -94,11 +50,9 @@ function getFilesRecursive(dir) {
     return results;
 }
 
-
-async function displayFileContent(fileName, rootPath) {
+async function findFileDetails(fileName, rootPath) {
     if (!rootPath) {
-        vscode.window.showErrorMessage("No folder or workspace opened");
-        return;
+        throw new Error("No folder or workspace opened");
     }
 
     const allFiles = getFilesRecursive(rootPath);
@@ -112,97 +66,40 @@ async function displayFileContent(fileName, rootPath) {
 
     if (fileFullPath) {
         const fileContent = fs.readFileSync(fileFullPath, 'utf8');
-        // Display content in a new read-only editor tab instead of a message box
-        const document = await vscode.workspace.openTextDocument({
-            language: 'text',
-            content: fileContent
-        });
-        await vscode.window.showTextDocument(document, { preview: false });
+        return { path: fileFullPath, name: path.basename(fileFullPath), content: fileContent };
     } else {
-        vscode.window.showInformationMessage('File not found in the project');
+        throw new Error('File not found in the project');
     }
 }
 
-exports.activate = activate;
-exports.deactivate = deactivate;
+let server;
 
+function startServer() {
+    const app = express();
+    app.use(express.json());
 
-
-/*
-  // "activationEvents":["activationEvents"],
-const vscode = require('vscode');
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
-
-function activate(context) {
-    // Register the command with the updated command name from `package.json`
-    let disposable = vscode.commands.registerCommand('hutouch.activate', async () => {
-        const input = await vscode.window.showInputBox({ placeHolder: 'Enter the filename (without extension)' });
-        if (input) {
-            const rootPath = vscode.workspace.workspaceFolders
-                ? vscode.workspace.workspaceFolders[0].uri.fsPath
-                : ""; // Get the path of the first workspace folder
-            displayFileContent(input.toLowerCase(), rootPath);  // Convert input to lower case
+    app.post('/file-content', async (req, res) => {
+        const { fileName } = req.body;
+        if (!fileName) {
+            return res.status(400).send({ error: 'fileName is required' });
         }
-    });
 
-    context.subscriptions.push(disposable);
-}
+        const rootPath = vscode.workspace.workspaceFolders
+            ? vscode.workspace.workspaceFolders[0].uri.fsPath
+            : ""; // Get the path of the first workspace folder
 
-function deactivate() {}
-
-function getFilesRecursive(dir) {
-    let results = [];
-    const list = fs.readdirSync(dir);
-
-    list.forEach(function(file) {
-        file = path.resolve(dir, file);
-        const stat = fs.statSync(file);
-        if (stat && stat.isDirectory()) {
-            results = results.concat(getFilesRecursive(file));
-        } else {
-            results.push(file);
-        }
-    });
-
-    return results;
-}
-
-async function displayFileContent(fileName, rootPath) {
-    if (!rootPath) {
-        vscode.window.showErrorMessage("No folder or workspace opened");
-        return;
-    }
-
-    const allFiles = getFilesRecursive(rootPath);
-    const fileFullPath = allFiles.find(f => path.basename(f, path.extname(f)).toLowerCase() === fileName);
-
-    if (fileFullPath) {
-        const fileContent = fs.readFileSync(fileFullPath, 'utf8');
-
-        // Send file content to the API endpoint
         try {
-            const response = await axios.post('http://your-api-endpoint.com/api/upload', {
-                fileName: path.basename(fileFullPath),
-                content: fileContent
-            });
-            vscode.window.showInformationMessage(`File data sent successfully: ${response.data.message}`);
+            const fileDetails = await findFileDetails(fileName.toLowerCase(), rootPath);
+            res.send(fileDetails);
         } catch (error) {
-            vscode.window.showErrorMessage(`Error sending file data: ${error.message}`);
+            res.status(404).send({ error: error.message });
         }
+    });
 
-        // Display content in a new read-only editor tab instead of a message box
-        const document = await vscode.workspace.openTextDocument({
-            language: 'text',
-            content: fileContent
-        });
-        await vscode.window.showTextDocument(document, { preview: false });
-    } else {
-        vscode.window.showInformationMessage('File not found in the project');
-    }
+    server = app.listen(PORT, () => {
+        console.log(`Hutouch File Finder server started on port ${PORT}`);
+    });
 }
 
 exports.activate = activate;
 exports.deactivate = deactivate;
-*/

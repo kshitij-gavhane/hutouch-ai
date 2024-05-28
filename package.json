@@ -2,7 +2,7 @@
   "name": "hutouch-ai",
   "displayName": "HuTouch AI",
   "description": "Supportive IDE extension for Hutouch AI winform.",
-  "version": "0.0.1",
+  "version": "1.10.1",
   "engines": {
     "vscode": "^1.89.0"
   },
@@ -10,25 +10,28 @@
     "Other"
   ],
   "publisher": "Kshitij Gavhane",
-  "activationEvents": ["onCommand:hutouch.activate"],
+  "activationEvents": ["*"],
   "main": "./extension.js",
   "repository": {
-        "type": "git",
-        "url": "https://github.com/kshitij-gavhane/hutouch-ai"
-    },
+    "type": "git",
+    "url": "https://github.com/kshitij-gavhane/hutouch-ai"
+  },
   "icon": "images/icon.png",
-    "contributes": {
+  "contributes": {
     "commands": [
-        {
-            "command": "hutouch.activate",
-            "title": "Activate HuTouch"
-        }
+      {
+        "command": "hutouch.activate",
+        "title": "Activate HuTouch"
+      }
     ]
   },
   "scripts": {
     "lint": "eslint .",
     "pretest": "npm run lint",
     "test": "vscode-test"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "@types/vscode": "^1.89.0",
