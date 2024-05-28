@@ -9,7 +9,7 @@
   "categories": [
     "Other"
   ],
-  "publisher": "Kshitij Gavhane",
+  "publisher": "KshitijGavhane",
   "activationEvents": ["*"],
   "main": "./extension.js",
   "repository": {
