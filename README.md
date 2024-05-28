@@ -8,7 +8,7 @@
 ## Features
 
 - Automatically starts an HTTP server on VS Code startup.
-- Listens for file content requests from external applications (e.g., WinForms) via an HTTP endpoint.
+- Listens for file content requests from HuTouch AI applications (WinForms) via an HTTP endpoint.
 - Searches for and retrieves file content in the currently opened workspace.
 - Returns file details including path, name, and content.
 
