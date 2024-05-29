@@ -2,17 +2,25 @@ const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+require('dotenv').config();
+const { default: OpenAI } = require('openai');
 
-const PORT = 45678; // Using an uncommon port
+const PORT = 45678;
+
+const openai = new OpenAI({
+    apiKey:"sk-proj-31UxLmHHYQZw1yebanjMT3BlbkFJ3KFD8n0kCkFfNFl6PAoP"
+});
 
 function activate(context) {
     startServer();
-    vscode.window.showInformationMessage(`Hutouch File Finder server started on port ${PORT}`);
+    vscode.window.showInformationMessage(`HuTouch AI File Analysis server started on port ${PORT}`);
 }
 
 function deactivate() {
     if (server) {
-        server.close();
+        server.close(() => {
+            console.log('Server closed');
+        });
     }
 }
 
@@ -24,76 +32,95 @@ const EXCLUDED_DIRS = [
     'static', '.expo', '.cache-loader', 'yarn.lock', 'package-lock.json'
 ];
 
-// Function to check if a directory should be excluded
 function shouldExclude(dir) {
     return EXCLUDED_DIRS.some(excludedDir => dir.includes(excludedDir));
 }
 
-// Recursive function to get files
 function getFilesRecursive(dir) {
     let results = [];
-    const list = fs.readdirSync(dir);
+    try {
+        const list = fs.readdirSync(dir);
+        list.forEach(function (file) {
+            file = path.resolve(dir, file);
+            const stat = fs.statSync(file);
+            if (stat.isDirectory() && !shouldExclude(file)) {
+                results = results.concat(getFilesRecursive(file));
+            } else if (stat.isFile()) {
+                results.push(file);
+            }
+        });
+    } catch (error) {
+        console.error(`Error reading directory ${dir}:`, error);
+    }
+    return results;
+}
 
-    list.forEach(function(file) {
-        file = path.resolve(dir, file);
-        const stat = fs.statSync(file);
-        const baseName = path.basename(file);
+async function analyzeFileContent(content, fileName) {
+    const fileType = path.extname(fileName).toLowerCase();
+    const prompt = `
+    Analyze the following ${fileType} code & FORMAT IN PROPER JSON WITHOUT ANY TEST DESCRIPTION. List all import statements excluding system or standard library dependencies. 
+    Then, Identify all files that are dependencies for this code:
+    \n\n${content}
+    \n\nList the imports and dependencies in the format:
+    Imports:
+    - <import statements>
 
-        // Skip directories that are in the EXCLUDED_DIRS list
-        if (stat && stat.isDirectory() && !shouldExclude(baseName)) {
-            results = results.concat(getFilesRecursive(file));
-        } else if (stat && stat.isFile()) {
-            results.push(file);
-        }
+    Dependencies:
+    - <ONLY NAME OF FILE WITH EXTENSION>
+   IMPORTANT: Ensure the response is a valid JSON object without any additional text or description.. DO NOT INCLUDE ANY TEXT/DESCRIPTION OTHER THAN THE IMPORTS AND DEPENDENCIES. GIVE FULL FILE NAME IN THE DEPENDENCIES WITH EXTENSION.
+    `;
+
+    const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        response_format: { type: "json_object" },
+        messages: [
+            { role: "system", content: "You are a helpful code analyser which returns only json output, and no extraneous text." },
+            { role: "user", content: prompt }
+        ]
     });
 
-    return results;
+    const text = completion.choices[0].message.content.trim();
+    try {
+        const analysis = JSON.parse(text);
+        return analysis;
+    } catch (error) {
+        console.error('Error parsing JSON from OpenAI response:', error);
+        throw new Error('Failed to parse JSON from OpenAI response');
+    }
 }
 
 async function findFileDetails(fileName, rootPath) {
-    if (!rootPath) {
-        throw new Error("No folder or workspace opened");
-    }
-
     const allFiles = getFilesRecursive(rootPath);
-    const fileFullPath = allFiles.find(f => {
-        const baseName = path.basename(f, path.extname(f)).toLowerCase();
-        const extName = path.extname(f).toLowerCase();
-        return fileName.includes('.')
-            ? (baseName + extName) === fileName
-            : baseName === fileName;
-    });
-
-    if (fileFullPath) {
-        const fileContent = fs.readFileSync(fileFullPath, 'utf8');
-        return { path: fileFullPath, name: path.basename(fileFullPath), content: fileContent };
-    } else {
+    const fileFullPath = allFiles.find(f => path.basename(f).toLowerCase() === fileName.toLowerCase());
+    if (!fileFullPath) {
         throw new Error('File not found in the project');
     }
-}
+    const fileContent = fs.readFileSync(fileFullPath, 'utf8');
+    const { Imports, Dependencies } = await analyzeFileContent(fileContent, fileName);
+    const fileDetails = {};
 
-// Recursive function to generate directory tree
-function generateDirectoryTree(dir, level = 0) {
-    let results = {};
-    const list = fs.readdirSync(dir);
+    // Add the main file content
+    fileDetails[fileFullPath] = {
+        content: fileContent,
+        imports: Imports,
+        dependencies: Dependencies
+    };
 
-    list.forEach(function(file) {
-        const fullPath = path.resolve(dir, file);
-        const stat = fs.statSync(fullPath);
-
-        // Skip excluded directories using the shouldExclude function
-        if (stat.isDirectory()) {
-            if (!shouldExclude(file)) {
-                results[file] = generateDirectoryTree(fullPath, level + 1);
-            }
-        } else if (stat.isFile()) {
-            results[file] = null; // null or some other representation for files
+    // Add the content of related files from dependencies
+    for (const dependency of Dependencies) {
+        const dependencyFileName = path.basename(dependency);
+        const dependencyFilePath = allFiles.find(f => path.basename(f) === dependencyFileName);
+        if (dependencyFilePath && fs.existsSync(dependencyFilePath)) {
+            fileDetails[dependencyFilePath] = {
+                content: fs.readFileSync(dependencyFilePath, 'utf8')
+            };
+        } else {
+            console.log(`Dependency file not found: ${dependencyFileName}`);
         }
-    });
+    }
 
-    return results;
+    return fileDetails;
 }
-
 
 let server;
 
@@ -106,40 +133,25 @@ function startServer() {
         if (!fileName) {
             return res.status(400).send({ error: 'fileName is required' });
         }
-
         const rootPath = vscode.workspace.workspaceFolders
             ? vscode.workspace.workspaceFolders[0].uri.fsPath
             : "";
-
+        if (!rootPath) {
+            return res.status(400).send({ error: 'No workspace folder open' });
+        }
         try {
-            const fileDetails = await findFileDetails(fileName.toLowerCase(), rootPath);
+            const fileDetails = await findFileDetails(fileName, rootPath);
             res.send(fileDetails);
         } catch (error) {
+            console.error('Error finding file details:', error);
             res.status(404).send({ error: error.message });
         }
     });
 
-    app.get('/directory-tree', async (req, res) => {
-        const rootPath = vscode.workspace.workspaceFolders
-            ? vscode.workspace.workspaceFolders[0].uri.fsPath
-            : null;
-
-        if (!rootPath) {
-            return res.status(400).send({ error: 'No workspace folder open' });
-        }
-
-        try {
-            const tree = generateDirectoryTree(rootPath);
-            res.json(tree);
-        } catch (error) {
-            res.status(500).send({ error: error.message });
-        }
-    });
-
-
-
     server = app.listen(PORT, () => {
-        console.log(`Hutouch File Finder server started on port ${PORT}`);
+        console.log(`HuTouch AI File Analysis server started on port ${PORT}`);
+    }).on('error', (err) => {
+        console.error('Server error:', err);
     });
 }
 

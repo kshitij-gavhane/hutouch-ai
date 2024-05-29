@@ -10,7 +10,9 @@
     "Other"
   ],
   "publisher": "KshitijGavhane",
-  "activationEvents": ["*"],
+  "activationEvents": [
+    "*"
+  ],
   "main": "./extension.js",
   "repository": {
     "type": "git",
@@ -31,15 +33,17 @@
     "test": "vscode-test"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "openai": "^4.47.2"
   },
   "devDependencies": {
-    "@types/vscode": "^1.89.0",
     "@types/mocha": "^10.0.6",
     "@types/node": "18.x",
-    "eslint": "^8.57.0",
-    "typescript": "^5.4.5",
+    "@types/vscode": "^1.89.0",
     "@vscode/test-cli": "^0.0.9",
-    "@vscode/test-electron": "^2.3.9"
+    "@vscode/test-electron": "^2.3.9",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.5"
   }
 }
