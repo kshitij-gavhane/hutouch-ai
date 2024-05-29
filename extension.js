@@ -109,7 +109,7 @@ function startServer() {
 
         const rootPath = vscode.workspace.workspaceFolders
             ? vscode.workspace.workspaceFolders[0].uri.fsPath
-            : ""; // Get the path of the first workspace folder
+            : "";
 
         try {
             const fileDetails = await findFileDetails(fileName.toLowerCase(), rootPath);
@@ -120,21 +120,22 @@ function startServer() {
     });
 
     app.get('/directory-tree', async (req, res) => {
-    const rootPath = vscode.workspace.workspaceFolders
-        ? vscode.workspace.workspaceFolders[0].uri.fsPath
-        : null;
+        const rootPath = vscode.workspace.workspaceFolders
+            ? vscode.workspace.workspaceFolders[0].uri.fsPath
+            : null;
 
-    if (!rootPath) {
-        return res.status(400).send({ error: 'No workspace folder open' });
-    }
+        if (!rootPath) {
+            return res.status(400).send({ error: 'No workspace folder open' });
+        }
 
-    try {
-        const tree = generateDirectoryTree(rootPath);
-        res.json(tree);
-    } catch (error) {
-        res.status(500).send({ error: error.message });
-    }
-});
+        try {
+            const tree = generateDirectoryTree(rootPath);
+            res.json(tree);
+        } catch (error) {
+            res.status(500).send({ error: error.message });
+        }
+    });
+
 
 
     server = app.listen(PORT, () => {
