@@ -72,6 +72,29 @@ async function findFileDetails(fileName, rootPath) {
     }
 }
 
+// Recursive function to generate directory tree
+function generateDirectoryTree(dir, level = 0) {
+    let results = {};
+    const list = fs.readdirSync(dir);
+
+    list.forEach(function(file) {
+        const fullPath = path.resolve(dir, file);
+        const stat = fs.statSync(fullPath);
+
+        // Skip excluded directories using the shouldExclude function
+        if (stat.isDirectory()) {
+            if (!shouldExclude(file)) {
+                results[file] = generateDirectoryTree(fullPath, level + 1);
+            }
+        } else if (stat.isFile()) {
+            results[file] = null; // null or some other representation for files
+        }
+    });
+
+    return results;
+}
+
+
 let server;
 
 function startServer() {
@@ -95,6 +118,24 @@ function startServer() {
             res.status(404).send({ error: error.message });
         }
     });
+
+    app.get('/directory-tree', async (req, res) => {
+    const rootPath = vscode.workspace.workspaceFolders
+        ? vscode.workspace.workspaceFolders[0].uri.fsPath
+        : null;
+
+    if (!rootPath) {
+        return res.status(400).send({ error: 'No workspace folder open' });
+    }
+
+    try {
+        const tree = generateDirectoryTree(rootPath);
+        res.json(tree);
+    } catch (error) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
 
     server = app.listen(PORT, () => {
         console.log(`Hutouch File Finder server started on port ${PORT}`);
