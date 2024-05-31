@@ -2,7 +2,7 @@
   "name": "hutouch-ai",
   "displayName": "HuTouch AI",
   "description": "Supportive IDE extension for Hutouch AI winform.",
-  "version": "1.10.1",
+  "version": "1.10.2",
   "engines": {
     "vscode": "^1.89.0"
   },

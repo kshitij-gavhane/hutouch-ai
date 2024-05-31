@@ -8,7 +8,7 @@ const { default: OpenAI } = require('openai');
 const PORT = 45678;
 
 const openai = new OpenAI({
-    apiKey:"sk-proj-31UxLmHHYQZw1yebanjMT3BlbkFJ3KFD8n0kCkFfNFl6PAoP"
+    apiKey: process.env.OPENAI_API_KEY
 });
 
 function activate(context) {
@@ -97,23 +97,25 @@ async function findFileDetails(fileName, rootPath) {
     }
     const fileContent = fs.readFileSync(fileFullPath, 'utf8');
     const { Imports, Dependencies } = await analyzeFileContent(fileContent, fileName);
-    const fileDetails = {};
+    const fileDetails = [];
 
     // Add the main file content
-    fileDetails[fileFullPath] = {
+    fileDetails.push({
+        file_path: fileFullPath,
         content: fileContent,
         imports: Imports,
         dependencies: Dependencies
-    };
+    });
 
     // Add the content of related files from dependencies
     for (const dependency of Dependencies) {
         const dependencyFileName = path.basename(dependency);
         const dependencyFilePath = allFiles.find(f => path.basename(f) === dependencyFileName);
         if (dependencyFilePath && fs.existsSync(dependencyFilePath)) {
-            fileDetails[dependencyFilePath] = {
+            fileDetails.push({
+                file_path: dependencyFilePath,
                 content: fs.readFileSync(dependencyFilePath, 'utf8')
-            };
+            });
         } else {
             console.log(`Dependency file not found: ${dependencyFileName}`);
         }
