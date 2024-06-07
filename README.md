@@ -1,7 +1,7 @@
 
 # HuTouch AI
 
-![HuTouch AI Logo](images/icon.png)
+![HuTouch AI Logo](https://www.hutouch.com/wp-content/uploads/2023/03/HuTouch-Final-Logo-08.png)
 
 **HuTouch AI** is a supportive IDE extension designed to enhance the workflow for HuTouch AI WinForms applications. This extension provides an integrated solution to interact with the file system through an HTTP server, allowing the WinForms application to request file content seamlessly.
 
