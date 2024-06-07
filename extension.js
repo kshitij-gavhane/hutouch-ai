@@ -18,6 +18,16 @@ function activate(context) {
   vscode.window.showInformationMessage(
     `HuTouch AI File Analysis server started on port ${PORT}`
   );
+
+  // Generate the folder structure file
+  const rootPath = vscode.workspace.workspaceFolders
+    ? vscode.workspace.workspaceFolders[0].uri.fsPath
+    : "";
+  if (rootPath) {
+    initializeFolderStructure(rootPath);
+  } else {
+    console.error("No workspace folder open");
+  }
 }
 
 function deactivate() {
@@ -28,61 +38,20 @@ function deactivate() {
   }
 }
 
-const EXCLUDED_DIRS = [
-  "node_modules",
-  ".vscode",
-  "dist",
-  "build",
-  ".git",
-  "coverage",
-  "out",
-  "bin",
-  "obj",
-  "target",
-  "__pycache__",
-  ".idea",
-  ".gradle",
-  ".mvn",
-  ".settings",
-  ".classpath",
-  ".project",
-  "CMakeFiles",
-  "CMakeCache.txt",
-  ".vs",
-  "packages",
-  ".history",
-  ".terraform",
-  ".serverless",
-  ".pytest_cache",
-  ".venv",
-  "Pods",
-  "DerivedData",
-  ".next",
-  ".nuxt",
-  "vendor",
-  ".sass-cache",
-  ".cache",
-  ".parcel-cache",
-  "elm-stuff",
-  "_site",
-  "public",
-  ".docusaurus",
-  "static",
-  ".expo",
-  ".cache-loader",
-];
+const EXCLUDED_DIRS = ["node_modules", ".vscode", "dist", "build", ".git", "coverage", "out", "bin", "obj", "target", "__pycache__", ".idea", ".gradle", ".mvn", ".settings", ".classpath", ".project", "CMakeFiles", "CMakeCache.txt", ".vs", "packages", ".history", ".terraform", ".serverless", ".pytest_cache", ".venv", "Pods", "DerivedData", ".next", ".nuxt", "vendor", ".sass-cache", ".cache", ".parcel-cache", "elm-stuff", "_site", "public", ".docusaurus", "static", ".expo", ".cache-loader"];
 
-const EXCLUDED_FILES = [
-  ".gitignore",
-  "README.md",
-  "yarn.lock",
-  "package-lock.json",
-  ".metadata",
-];
+const EXCLUDED_FILES = [".gitignore", "README.md", "yarn.lock", "package-lock.json", ".metadata"];
+
+const EXCLUDED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".ico", ".webp", ".tif", ".tiff", ".mp3", ".wav", ".ogg", ".flac", ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".3gp", ".mpg", ".mpeg", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".epub", ".mobi", ".azw", ".azw3", ".lit", ".lrf", ".cbr", ".cbz", ".cb7", ".cbt", ".cba", ".psd", ".ai", ".eps", ".indd", ".xd", ".sketch", ".fig", ".zip", ".tar", ".gz", ".rar", ".7z", ".bz2", ".xz", ".iso", ".dmg", ".exe", ".msi", ".dll", ".deb", ".rpm", ".sh", ".bat", ".com", ".vbs", ".ps1", ".apk", ".ipa", ".jar", ".war", ".ear", ".phar"];
 
 function shouldExclude(fileOrDir) {
   const name = path.basename(fileOrDir);
-  return EXCLUDED_DIRS.includes(name) || EXCLUDED_FILES.includes(name);
+  const ext = path.extname(fileOrDir).toLowerCase();
+  return (
+    EXCLUDED_DIRS.includes(name) ||
+    EXCLUDED_FILES.includes(name) ||
+    EXCLUDED_EXTENSIONS.includes(ext)
+  );
 }
 
 function getFilesRecursive(dir) {
@@ -187,6 +156,20 @@ async function findFileDetails(fileName, rootPath) {
 }
 
 function generateFolderStructure(dir, prefix = "") {
+  const structureFilePath = path.resolve(dir, "project_structure.txt");
+
+  // Check if the structure file exists
+  if (fs.existsSync(structureFilePath)) {
+    try {
+      // Read and return the content of the existing structure file
+      const existingStructure = fs.readFileSync(structureFilePath, "utf8");
+      return existingStructure;
+    } catch (error) {
+      console.error(`Error reading existing structure file:`, error);
+    }
+  }
+
+  // Generate new folder structure if the file does not exist
   let result = "";
   try {
     const list = fs.readdirSync(dir);
@@ -206,10 +189,20 @@ function generateFolderStructure(dir, prefix = "") {
         result += `${newPrefix}${file}\n`;
       }
     });
+
+    // Write the generated structure to the file
+    fs.writeFileSync(structureFilePath, result);
   } catch (error) {
     console.error(`Error reading directory ${dir}:`, error);
   }
+
   return result;
+}
+
+function initializeFolderStructure(rootPath) {
+  const structure = generateFolderStructure(rootPath);
+  console.log("Generated folder structure:");
+  console.log(structure);
 }
 
 let server;
@@ -246,6 +239,26 @@ function startServer() {
     } catch (error) {
       console.error("Error finding file details:", error);
       res.status(404).send({ error: error.message });
+    }
+  });
+
+  app.get("/all-files", async (req, res) => {
+    const rootPath = vscode.workspace.workspaceFolders
+      ? vscode.workspace.workspaceFolders[0].uri.fsPath
+      : "";
+    if (!rootPath) {
+      return res.status(400).send({ error: "No workspace folder open" });
+    }
+    try {
+      const allFiles = getFilesRecursive(rootPath);
+      const fileDetails = allFiles.map((filePath) => ({
+        file_path: filePath,
+        content: fs.readFileSync(filePath, "utf8"),
+      }));
+      res.send(fileDetails);
+    } catch (error) {
+      console.error("Error retrieving all files:", error);
+      res.status(500).send({ error: "Failed to retrieve all files" });
     }
   });
 
