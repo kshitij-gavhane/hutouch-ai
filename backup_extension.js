@@ -277,60 +277,6 @@ async function findFileDetails(fileName, rootPath) {
   return fileDetails;
 }
 
-async function findMultipleFileDetails(fileNames, rootPath) {
-  const allFiles = getFilesRecursive(rootPath);
-  console.log("All files:", allFiles); // Debugging information
-  const fileDetails = [];
-
-  for (const fileName of fileNames) {
-    const fileFullPath = allFiles.find(
-      (f) => path.basename(f).toLowerCase() === fileName.toLowerCase()
-    );
-    console.log("File full path for", fileName, ":", fileFullPath); // Debugging information
-
-    if (!fileFullPath) {
-      throw new Error(`File not found in the project: ${fileName}`);
-    }
-
-    const fileContent = fs.readFileSync(fileFullPath, "utf8");
-    /*
-    const { Imports, Dependencies } = await analyzeFileContent(
-      fileContent,
-      fileName
-    );
-    */
-
-    // Add the main file content
-    fileDetails.push({
-      file_path: fileFullPath,
-      content: fileContent,
-      imports: [], // Imports || [],
-      dependencies: [], // Dependencies || [],
-    });
-
-    // Add the content of related files from dependencies (optional)
-    // Uncomment the following block if you want to include dependencies
-    /*
-    for (const dependency of Dependencies) {
-      const dependencyFileName = path.basename(dependency);
-      const dependencyFilePath = allFiles.find(
-        (f) => path.basename(f).toLowerCase() === dependencyFileName.toLowerCase()
-      );
-      if (dependencyFilePath && fs.existsSync(dependencyFilePath)) {
-        fileDetails.push({
-          file_path: dependencyFilePath,
-          content: fs.readFileSync(dependencyFilePath, "utf8"),
-        });
-      } else {
-        console.log(`Dependency file not found: ${dependencyFileName}`);
-      }
-    }
-    */
-  }
-
-  return fileDetails;
-}
-
 function generateFolderStructure(dir, prefix = "") {
   let result = "";
   try {
@@ -388,26 +334,6 @@ function startServer() {
         content: folderStructure,
       });
       res.send(response);
-    } catch (error) {
-      console.error("Error finding file details:", error);
-      res.status(404).send({ error: error.message });
-    }
-  });
-
-  app.post("/multiple-file-contents", async (req, res) => {
-    const { fileNames } = req.body;
-    if (!fileNames || !Array.isArray(fileNames)) {
-      return res.status(400).send({ error: "fileNames array is required" });
-    }
-    const rootPath = vscode.workspace.workspaceFolders
-      ? vscode.workspace.workspaceFolders[0].uri.fsPath
-      : "";
-    if (!rootPath) {
-      return res.status(400).send({ error: "No workspace folder open" });
-    }
-    try {
-      const fileDetails = await findMultipleFileDetails(fileNames, rootPath);
-      res.send(fileDetails);
     } catch (error) {
       console.error("Error finding file details:", error);
       res.status(404).send({ error: error.message });
