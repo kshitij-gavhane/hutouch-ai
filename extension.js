@@ -394,25 +394,32 @@ function startServer() {
     }
   });
 
-  app.post("/multiple-file-contents", async (req, res) => {
-    const { fileNames } = req.body;
-    if (!fileNames || !Array.isArray(fileNames)) {
-      return res.status(400).send({ error: "fileNames array is required" });
-    }
-    const rootPath = vscode.workspace.workspaceFolders
-      ? vscode.workspace.workspaceFolders[0].uri.fsPath
-      : "";
-    if (!rootPath) {
-      return res.status(400).send({ error: "No workspace folder open" });
-    }
-    try {
-      const fileDetails = await findMultipleFileDetails(fileNames, rootPath);
-      res.send(fileDetails);
-    } catch (error) {
-      console.error("Error finding file details:", error);
-      res.status(404).send({ error: error.message });
-    }
-  });
+app.post("/multiple-file-contents", async (req, res) => {
+  const { fileNames } = req.body;
+  if (!fileNames || !Array.isArray(fileNames)) {
+    return res.status(400).send({ error: "fileNames array is required" });
+  }
+  const rootPath = vscode.workspace.workspaceFolders
+    ? vscode.workspace.workspaceFolders[0].uri.fsPath
+    : "";
+  if (!rootPath) {
+    return res.status(400).send({ error: "No workspace folder open" });
+  }
+  try {
+    const fileDetails = await findMultipleFileDetails(fileNames, rootPath);
+    const folderStructure = generateFolderStructure(rootPath);
+    fileDetails.push({
+      file_path: "Readme.txt",
+      content: folderStructure,
+      imports: [],
+      dependencies: []
+    });
+    res.send(fileDetails);
+  } catch (error) {
+    console.error("Error finding file details:", error);
+    res.status(404).send({ error: error.message });
+  }
+});
 
   app.get("/all-files", async (req, res) => {
     const { role } = req.query;
